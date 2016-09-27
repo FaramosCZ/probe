@@ -1,4 +1,4 @@
-/*------------------------------------------------------------------------------
+/*---------------------------------------------------------------------------------------------------------------
 Projekt: Login screen
 Author: Michal Schorm <mschorm@centrum.cz> <mschorm@redhat.com> <faramos.cz@gmail.com>
 Date: 5/2016, 9/2016                                                
@@ -7,7 +7,12 @@ File content: class Login
 
 Feature request: additional parameter to manage input file with encrypted credential
 Feature request: additional parameter to encrypt input file with chosen method (one-way ciphers recomended)
--------------------------------------------------------------------------------*/
+Feature request: hide stderr info
+		 all signals
+		 basic login fallback ??
+		 move lines to array
+		 define lines variables near array
+---------------------------------------------------------------------------------------------------------------*/
 #include <iostream>    // cin, cout
 #include <cstddef>     // work with NULL
 #include <string>      // strings...
@@ -20,11 +25,15 @@ using namespace std;
 
 
 
-//!  Class Login - basic "Login - Password" dialog box in CLI 
+//!  Class Login - basic "Login - Password" centered dialog box in CLI 
 /*!
-  restrict access to anything behind this program
-  provide very simple file with logins and passwords combinations.
+  Restrict access to anything behind this program
+  Provide very simple file with logins and passwords combinations.
+  
+  This programm react to resize of console window. When console windows is smaller than box, box will hide and wait for console window enlargement.
+
   Warning: This program will mask (block) many signals, in order to deny all other communication with shell than to this program. Shortcuts like "CTRL+C or CTRL+Z" won't work.
+	   Only one signal can't be masked. Use "pkill -9 name_of_process" to kill any and all instances running
 */
 
 #ifndef LOGIN_CLASS
@@ -56,12 +65,14 @@ class Login
    string input_password;							// buffer for password
    string input_password_hidden;						// buffer for displayed password (set of "***")
    
-   string line_1 = "+--------------------------------+ ";			// Template for the box
-   string line_2 = "|                                | ";			// |
-   string line_3 = "| Login:                         | ";			// |
-   string line_4 = "| Password:                      | ";			// |
-   string line_5 = "|                                | ";			// |
-   string line_6 = "+--------------------------------+ ";			// |__  
+   string line_1 = "+--------------------------------+";			// Template for the box
+   string line_2 = "|                                |";			// |
+   string line_3 = "| Login:                         |";			// |
+   string line_4 = "| Password:                      |";			// |
+   string line_5 = "|                                |";			// |
+   string line_6 = "+--------------------------------+";			// |__  
+
+
 
    //! Check if file with accounts has a valid format
    bool Check_file_integrity_accounts()
@@ -77,6 +88,8 @@ class Login
       return false;   
      }
 
+
+
    //! ASCII graphic layout computing
    void Resize(bool force)
      {
@@ -89,10 +102,10 @@ class Login
 
       this->box_width = this->line_1.length();		// length of one line
       this->box_height = 6;				// this box consists of 6 rows
-      this->width_of_predefined_text = 12;		// ??
-      this->line_text = 2;				// ??
+      this->width_of_predefined_text = 12;		// Lenght of "| Password: " string. Info for password and Login to fit in.
+      this->line_text = 2;				// Text starts on 2nd row of the box (count from 0)
 
-      while(this->box_width > this->screen.ws_col+1 || this->box_height > this->screen.ws_row  )	// if the box is bigger than the window, hide it and wait for resize
+      while(this->box_width > this->screen.ws_col+1 || this->box_height > this->screen.ws_row-1  )	// if the box is bigger than the window, hide it and wait for resize
         {
          system("clear");
 
@@ -109,7 +122,7 @@ class Login
       this->space_above_box += (this->screen.ws_row-this->box_height)%2;				// |__
       
       if(this->buffer != NULL) this->buffer->clear();
-      this->buffer = new string(this->screen.ws_col*(this->screen.ws_row-1), ' ');  			// fill buffer with spaces
+      this->buffer = new string((this->screen.ws_col*(this->screen.ws_row))-1, ' ');  			// fill buffer with spaces, left the last blank (prevent cursor to jump onto next line)
       this->buffer->replace( (this->screen.ws_col*(this->space_above_box+0)+this->space_before_box), this->line_1.length(), this->line_1);  // and draw the box                                                                     
       this->buffer->replace( (this->screen.ws_col*(this->space_above_box+1)+this->space_before_box), this->line_2.length(), this->line_2);
       this->buffer->replace( (this->screen.ws_col*(this->space_above_box+2)+this->space_before_box), this->line_3.length(), this->line_3);
@@ -118,8 +131,10 @@ class Login
       this->buffer->replace( (this->screen.ws_col*(this->space_above_box+5)+this->space_before_box), this->line_6.length(), this->line_6);        
 
       system("clear");system("clear");			// 2x clear to completely hide rest of the box in case of scrolling 
-      cout << *(this->buffer) << endl;
+      cout << *(this->buffer);
      }
+
+
 
    //! Signal blocking
    void Signal()
@@ -145,6 +160,8 @@ class Login
 
 
 
+
+
  public:
    //! Constructor
    Login(string accounts_file)
@@ -161,6 +178,8 @@ class Login
 
       this->Signal();						// block all keyboard signals - give user no chance to escape from login screen to the system
      }
+
+
 
    //! Check if given combination of Login and Password exists
    bool Check_credentials(string login, string password)
@@ -179,54 +198,28 @@ class Login
       return false;
      }
 
-   //! testing login - password shown !
-   void Login_classic()
-     {
-      string login;
-      string password;
-      bool match = false;
 
-      do{
-         system("clear");
-         system("clear");
-         
-         cout << "Login: ";
-         getline(cin, login);
-         cout << "Password: ";
-         getline(cin, password);
-         
-         match = this->Check_credentials(login, password); 
 
-         if(match!=true)
-           {
-            cout << "\n\nINVALID LOGIN OR PASSWORD\n";
-            usleep(1000*1000*2);
-            continue;
-           }
-         else break; 
-        } while (1);
-     }
-  
    //! Login with centered dialog box in CLI
-   void Login_ascii_graphic()
+   void Draw()
      {
       while( 1 )
         {         
           while( 1 ) // Get input for "Login: " field
             {         
-             this->Resize(1);
+             this->Resize(0);
              // Move "cursor" position and rewrite line with "Login: "
 	     printf("\n\033[%d;%dH %s", this->space_above_box+this->line_text, this->space_before_box+this->width_of_predefined_text, this->input_login.c_str());
-             fflush(stdout); // without fflush data will remain in stdout buffer
+             fflush(stdout);														// without fflush data will remain in stdout buffer
              
-             if( this->input_login.length()==20 ) break; // check length overflow
+             if( this->input_login.length()>=20 ) break;										// check length overflow
              
-             system("stty raw"); 	// This will change some input behaviour, so you don't need to press ENTER after every getchar
+             system("stty raw"); 													// This will change some input behaviour, so you don't need to press ENTER after every getchar
              this->znak = getchar();
-             system("stty cooked"); 	// and now take it back to normal
+             system("stty cooked"); 													// and now take it back to normal
       
-             if( this->znak>=20 && this->znak<=126) { this->input_login += this->znak; }	// Add character only if it is some basic printable char
-             else if(this->znak==13 || this->znak==10) break;                             	// check for ENTER
+             if( this->znak>=20 && this->znak<=126) { this->input_login += this->znak; }						// Add character only if it is some basic printable char
+             else if(this->znak==13 || this->znak==10) break;                             						// check for ENTER
             }
           
           if( this->input_login.length()>=20 ){this->input_login.clear(); this->Resize(1); continue;}  
@@ -235,26 +228,27 @@ class Login
             {         
              this->Resize(0);
 	     // Now move "cursor" position and rewrite lines with "Login: " and "Password: "
-             printf("\n\033[%d;%dH %s  ", this->space_above_box+this->line_text, this->space_before_box+this->width_of_predefined_text, this->input_login.c_str());		// two spaces at the end will overwrite "^M" char for newline
+             printf("\n\033[%d;%dH %s  \b\b", this->space_above_box+this->line_text, this->space_before_box+this->width_of_predefined_text, this->input_login.c_str());		// two spaces at the end will overwrite "^M" char for newline
              printf("\n\033[%d;%dH %s", this->space_above_box+this->line_text+1, this->space_before_box+this->width_of_predefined_text, this->input_password_hidden.c_str());
-             fflush(stdout); // without fflush data will remain in stdout buffer
+             fflush(stdout);														// without fflush data will remain in stdout buffer
       
-             if( this->input_password.length()==20 ) break; // check length overflow
+             if( this->input_password.length()>=19 ) break; 										// check length overflow
       
-             system("stty raw"); 	// This will change some input behaviour, so you don't need to press ENTER after every getchar
+             system("stty raw"); 													// This will change some input behaviour, so you don't need to press ENTER after every getchar
              this->znak = getchar(); 
-             system("stty cooked"); 	// and now take it back to normal
+             system("stty cooked"); 													// and now take it back to normal
              
-             if( this->znak>=20 && this->znak<=126) { this->input_password += this->znak; this->input_password_hidden += '*';} // Add character only if it is some basic printable char and print aditional "*" to "Password: " field   
-             else if(this->znak==13 || this->znak==10) break;	// check for ENTER                        
+             if( this->znak>=20 && this->znak<=126) { this->input_password += this->znak; this->input_password_hidden += '*';} 		// Add character only if it is some basic printable char and print aditional "*" to "Password: " field   
+             else if(this->znak==13 || this->znak==10) break;										// check for ENTER                        
             }
 
-         // overwrite displayed "Enter" character behind password with 2 spaces behind string
-         printf("\n\033[%d;%dH %s  ", this->space_above_box+this->line_text+1, this->space_before_box+this->width_of_predefined_text, this->input_password_hidden.c_str());
-         fflush(stdout); // without fflush data Will remain include stdout buffer
          
-         if( this->input_password.length()>=20 ){this->input_login.clear(); this->input_password.clear(); this->input_password_hidden.clear(); continue;} 
-         if( this->Check_credentials(this->input_login, this->input_password) ) break;		// If credentials are correct, quit login loop
+         printf("\n\033[%d;%dH %s  \b\b", this->space_above_box+this->line_text+1, this->space_before_box+this->width_of_predefined_text, this->input_password_hidden.c_str());	// overwrite displayed "Enter" character behind password with 2 spaces behind string
+	 printf("\n\033[%d;%dH ", this->space_above_box+this->line_text+6, this->space_before_box+8);					// move cursor position before going to sleep to prevent input buffer to destroy box
+         fflush(stdout); 														// without fflush data Will remain include stdout buffer
+         
+	 usleep(1000*1000*1);														// sleep even before Check_credentials(). This is defense against brute force (get result, kill program, retry)
+         if( this->input_password.length()<19 && this->Check_credentials(this->input_login, this->input_password) ) break;		// If credentials are correct, quit login loop
          
 	 // Empty buffers               
          this->input_login.clear();
@@ -263,10 +257,10 @@ class Login
          
 	 // Print some info about situation
          printf("\n\033[%d;%dH %s", this->space_above_box+this->line_text+6, this->space_before_box+8, "ACCESS DENIED !!!\n");
-         usleep(1000*1000*2);			// defense against brute force attack (And for user to read status message)
-
+         usleep(1000*1000*2);														// defense against brute force attack (And for user to read status message)
+	 this->Resize(1);
         }
-      system("clear");				// clear screen after successful login     
+      system("clear");															// clear screen after successful login     
      }     
 
 };
